@@ -6883,7 +6883,10 @@ CTranslatorExprToDXL::AddWindowFirstSortColToProjList
 				}
 			}
 		}
-		AddWindowFirstSortColToProjList(pmp, pdxln->PdrgpdxlnChildren(), pcrFirstSortCol);
+		if (EdxlopPhysicalWindow != pdxln->Pdxlop()->Edxlop())
+		{
+			AddWindowFirstSortColToProjList(pmp, pdxln->PdrgpdxlnChildren(), pcrFirstSortCol);
+		}
 	}
 }
 //---------------------------------------------------------------------------
