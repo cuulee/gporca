@@ -824,6 +824,14 @@ namespace gpopt
 				CExpression *pexprScalar,
 				CColRefSet *pcrsReqdOutput // append the required column reference
 				);
+		
+			static
+			void AddWindowFirstSortColToProjList
+				(
+				IMemoryPool *pmp,
+				const DrgPdxln *pdrgpdxlnChildren,
+				const CColRef *pcrFirstSortCol
+				);
 	public:
 			// ctor
 			CTranslatorExprToDXL

@@ -6762,6 +6762,11 @@ CTranslatorExprToDXL::PdxlnWindow
 	DrgPos *pdrgpos = popSeqPrj->Pdrgpos();
 	GPOS_ASSERT(NULL != pdrgpos);
 	const ULONG ulOsSize = pdrgpos->UlLength();
+	const CColRef *pcrFirstSortCol = NULL;
+	COrderSpec *pos = (*popSeqPrj->Pdrgpos())[0];
+	if(pos->UlSortColumns() > 0)
+		pcrFirstSortCol = pos->Pcr(0);
+
 	for (ULONG ul = 0; ul < ulOsSize; ul++)
 	{
 		CDXLWindowKey *pdxlwk = GPOS_NEW(m_pmp) CDXLWindowKey(m_pmp);
@@ -6823,6 +6828,15 @@ CTranslatorExprToDXL::PdxlnWindow
 	pdxlnWindow->AddChild(pdxlnFilter);
 	pdxlnWindow->AddChild(pdxlnChild);
 
+	ULONG ulLen = pdxlnWindow->PdrgpdxlnChildren()->UlLength();
+	for (ULONG ul=0; ul < ulLen && NULL != pcrFirstSortCol ; ul++)
+	{
+		CDXLNode *pdxlnWindowChild = (*pdxlnWindow->PdrgpdxlnChildren())[ul];
+		if (EdxlopScalarProjectList != pdxlnWindowChild->Pdxlop()->Edxlop())
+		{
+			AddWindowFirstSortColToProjList(m_pmp,pdxlnWindowChild->PdrgpdxlnChildren(),pcrFirstSortCol);
+		}
+	}
 #ifdef GPOS_DEBUG
 	pdxlopWindow->AssertValid(pdxlnWindow, false /* fValidateChildren */);
 #endif
@@ -6832,7 +6846,46 @@ CTranslatorExprToDXL::PdxlnWindow
 	return pdxlnWindow;
 }
 
-
+void
+CTranslatorExprToDXL::AddWindowFirstSortColToProjList
+	(
+	IMemoryPool *pmp,
+	const DrgPdxln *pdrgpdxlnChildren,
+	const CColRef *pcrFirstSortCol
+	)
+{
+	for (ULONG ul=0; ul < pdrgpdxlnChildren->UlLength(); ul++)
+	{
+		CDXLNode *pdxln = (*pdrgpdxlnChildren)[ul];
+		if (EdxlopScalarProjectList == pdxln->Pdxlop()->Edxlop())
+		{
+			ULONG ulLen = pdxln->PdrgpdxlnChildren()->UlLength();
+			
+			for(ULONG ulPr = 0; ulPr < ulLen; ulPr++)
+			{
+				CDXLNode *pdxlnPrEl = (*pdxln->PdrgpdxlnChildren())[ulPr];
+				CDXLScalarProjElem *pdxlsprel = CDXLScalarProjElem::PdxlopConvert(pdxlnPrEl->Pdxlop());
+				if( pdxlsprel->UlId() == pcrFirstSortCol->UlId())
+				{
+					CMDName *pmdname = GPOS_NEW(pmp) CMDName(pmp, pcrFirstSortCol->Name().Pstr());
+					CMDName *pmdname2 = GPOS_NEW(pmp) CMDName(pmp, pcrFirstSortCol->Name().Pstr());
+					CDXLScalarProjElem *pdxlopPrEl = GPOS_NEW(pmp) CDXLScalarProjElem(pmp, pcrFirstSortCol->UlId(), pmdname);
+					CDXLNode *pdxlnPrEl = GPOS_NEW(pmp) CDXLNode(pmp, pdxlopPrEl);
+					
+					IMDId *pmdidType = pcrFirstSortCol->Pmdtype()->Pmdid();
+					pmdidType->AddRef();
+					CDXLColRef *pdxlcr = GPOS_NEW(pmp) CDXLColRef(pmp, pmdname2, pdxlopPrEl->UlId());
+					CDXLScalarIdent *pdxlnScId = GPOS_NEW(pmp) CDXLScalarIdent(pmp, pdxlcr, pmdidType);
+					CDXLNode *pdxlnIdent = GPOS_NEW(pmp) CDXLNode(pmp, pdxlnScId);
+					pdxlnPrEl->AddChild(pdxlnIdent);
+					pdxln->AddChild(pdxlnPrEl);
+					break;
+				}
+			}
+		}
+		AddWindowFirstSortColToProjList(pmp, pdxln->PdrgpdxlnChildren(), pcrFirstSortCol);
+	}
+}
 //---------------------------------------------------------------------------
 //	@function:
 //		CTranslatorExprToDXL::PdxlnArray
